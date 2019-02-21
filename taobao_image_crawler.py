@@ -24,6 +24,9 @@ MONGODB_COLLECTION = 'taobao'
 
 COOKIES = 'miid=9059030392035869736; cna=9GnBE24ycD4CAd3dHSVkcLka; hng=CN%7Czh-CN%7CCNY%7C156; thw=cn; tg=0; t=038c33ba8aab8ca768d40a6eab66d828; _uab_collina=154907493821998864468959; _cc_=V32FPkk%2Fhw%3D%3D; enc=RRC8ncbpfOZMLPZ4BSFYrLIXir1vtgtBd1%2BKcHsVHWDFvogyr8IpgJINMgLZUEEseQnXf4x6ARIfLYdrLweo4w%3D%3D; mt=ci=0_0; _m_h5_tk=30a92ebafc749c4311cba309a31700c6_1549219346290; _m_h5_tk_enc=028bcf7811aeadf87efd0b57859fc344; v=0; cookie2=391c6d6c34d539fc0ef7417f0c8a7e88; _tb_token_=3ee7e1775d3e1; alitrackid=www.taobao.com; lastalitrackid=www.taobao.com; JSESSIONID=2D0A78F41775DEB1F9B7CAB5EFAD026C; x5sec=7b227365617263686170703b32223a223336376534663935373732333834376537323964663030623935626166643935434f2b70352b4946454a433876746a6b2f6337476f514561444459334e7a59794f4451334d4473794d413d3d227d; isg=BDEx7a0KyZlrs2KLbEkfa750QLsLtrrKGOWX9xNGA_gXOlCMW2xoYAlbXIb58j3I; l=bBIoM2gmvs3LDcv1BOCiquI81xbOdIRfguPRwGyei_5IK6L1x27OlR1QJFp6Vf5PttTB4cyBlueTfUggJPvN.'
 
+# 每个关键词爬取3页
+PAGE_NUMBER = 3
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
@@ -94,9 +97,6 @@ def set_driver():
     options.add_argument('user-agent={user_agent}'.format(user_agent=user_agent.randomly_select()))
 
     options.add_argument('--headless')
-    # 配置不加载图片
-    # prefs = {"profile.managed_default_content_settings.images": 2}
-    # options.add_experimental_option("prefs", prefs)
     return webdriver.Chrome('{path}'.format(path=DRIVER_PATH), chrome_options=options)
 
 
@@ -127,8 +127,6 @@ def search_by_keyword(driver, word):
             index = 0
             retry_times = 0
             while True:
-                # print(index)
-                # print(len(img_list))
                 if index >= len(img_list):
                     # 等待更多的图片加载，如果等待3次图片数量没有增加，退出循环
                     retry_times = retry_times + 1
@@ -162,22 +160,25 @@ def search_by_keyword(driver, word):
                 }
                 mongo.save_info(item)
 
-    for page in range(3):
+    for page in range(PAGE_NUMBER):
         logging.info('Keyword: %s, page: %d, start crawling images.' % (word, page + 1))
         paras = {
             'q': word,
             's': 44 * page
         }
         base_url = 'https://s.taobao.com/search?'
+        # 生成商品列表页url
         url = base_url + urlencode(paras)
         driver.get(url)
 
+        # xpath提取页面中的每个商品url
         goods = driver.find_elements_by_xpath(
             '//div[@id= "mainsrp-itemlist"]//div[@class="items"]//div[@class="pic"]/a')
         good_urls = []
         for good in goods:
             good_urls.append((good.get_attribute('href'), good.find_element_by_xpath('./img').get_attribute('alt')))
 
+        # 依次爬取每个详情页中的图片
         for url, title in good_urls:
             parse_detail_page(url, title)
 
@@ -194,6 +195,7 @@ if __name__ == '__main__':
     time.sleep(2)
 
     try:
+        # 根据关键词依次爬取
         for index, word in enumerate(keywords):
             logging.info('Keyword: %s, start searching images.' % word)
             search_by_keyword(driver, word)
