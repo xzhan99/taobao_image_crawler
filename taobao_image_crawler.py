@@ -22,10 +22,12 @@ MONGODB_USER = 'qidun'
 MONGODB_PASS = 'Z0tPAyMToLSH'
 MONGODB_COLLECTION = 'taobao'
 
-COOKIES = 'miid=9059030392035869736; cna=9GnBE24ycD4CAd3dHSVkcLka; hng=CN%7Czh-CN%7CCNY%7C156; thw=cn; tg=0; t=038c33ba8aab8ca768d40a6eab66d828; _uab_collina=154907493821998864468959; _cc_=V32FPkk%2Fhw%3D%3D; enc=RRC8ncbpfOZMLPZ4BSFYrLIXir1vtgtBd1%2BKcHsVHWDFvogyr8IpgJINMgLZUEEseQnXf4x6ARIfLYdrLweo4w%3D%3D; mt=ci=0_0; _m_h5_tk=30a92ebafc749c4311cba309a31700c6_1549219346290; _m_h5_tk_enc=028bcf7811aeadf87efd0b57859fc344; v=0; cookie2=391c6d6c34d539fc0ef7417f0c8a7e88; _tb_token_=3ee7e1775d3e1; alitrackid=www.taobao.com; lastalitrackid=www.taobao.com; JSESSIONID=2D0A78F41775DEB1F9B7CAB5EFAD026C; x5sec=7b227365617263686170703b32223a223336376534663935373732333834376537323964663030623935626166643935434f2b70352b4946454a433876746a6b2f6337476f514561444459334e7a59794f4451334d4473794d413d3d227d; isg=BDEx7a0KyZlrs2KLbEkfa750QLsLtrrKGOWX9xNGA_gXOlCMW2xoYAlbXIb58j3I; l=bBIoM2gmvs3LDcv1BOCiquI81xbOdIRfguPRwGyei_5IK6L1x27OlR1QJFp6Vf5PttTB4cyBlueTfUggJPvN.'
+COOKIES = 'miid=9059030392035869736; cna=9GnBE24ycD4CAd3dHSVkcLka; hng=CN%7Czh-CN%7CCNY%7C156; thw=cn; tg=0; t=038c33ba8aab8ca768d40a6eab66d828; _uab_collina=154907493821998864468959; _cc_=V32FPkk%2Fhw%3D%3D; enc=RRC8ncbpfOZMLPZ4BSFYrLIXir1vtgtBd1%2BKcHsVHWDFvogyr8IpgJINMgLZUEEseQnXf4x6ARIfLYdrLweo4w%3D%3D; mt=ci%3D-1_1; l=bBIoM2gmvs3LDMJxBOCgSZarbNbOSIRxXuWbUoCHi_5HY18__u_OloNQWeJ62f5R_B8B4cyBlup9-etXv; v=0; cookie2=1e30f7364e78396b631135a64f4b3006; _tb_token_=3b38be343d9e6; alitrackid=www.taobao.com; lastalitrackid=www.taobao.com; _m_h5_tk=5ffeda61b0887d04525aef63d8f4e67b_1550642352420; _m_h5_tk_enc=129970ae40f2d3c69217d65f41765c7c; x5sec=7b227365617263686170703b32223a223362383538616534326638646565343336353033643066313365616261643539434f2b6875654d46454a6a47755a58676872694b4a686f4c4e6a63334e6a49344e4463774f7a453d227d; JSESSIONID=4F80A935E8CD3A935F35C09D1A66B5D2; isg=BFVVgevnpfoS1oa3qBUDP7JAZFcFUHIpLCbCbtf6AUwbLnUgn6ALNYXs_Ho9LiEc'
 
 # 每个关键词爬取3页
 PAGE_NUMBER = 3
+# 缓冲区大小，达到100条数据写入mongodb
+BUFFER_SIZE = 100
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -43,7 +45,6 @@ class RandomUserAgent(object):
 
 
 class MongoHelper(object):
-    BUFFER_SIZE = 50
     write_buffer = None
     total = 0
 
@@ -74,7 +75,8 @@ class MongoHelper(object):
             self.flush()
 
     def close(self):
-        logging.info('MongoHelper is closing client, flushing data to MongoDB.')
+        logging.info('MongoHelper is closing client, flushing data to MongoDB. '
+                     '%d items have been saved in total' % self.total)
         self.flush()
         self.client.close()
 
@@ -95,7 +97,6 @@ def set_driver():
     options = webdriver.ChromeOptions()
     user_agent = RandomUserAgent()
     options.add_argument('user-agent={user_agent}'.format(user_agent=user_agent.randomly_select()))
-
     options.add_argument('--headless')
     return webdriver.Chrome('{path}'.format(path=DRIVER_PATH), chrome_options=options)
 
