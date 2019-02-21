@@ -69,7 +69,7 @@ class MongoHelper(object):
         if isinstance(item, dict):
             self.write_buffer.append(item)
             self.total += 1
-        if len(self.write_buffer) >= self.BUFFER_SIZE:
+        if len(self.write_buffer) >= BUFFER_SIZE:
             logging.info('MongoHelper buffer reached threshold, flushing data to MongoDB. '
                          '%d items have been saved in total' % self.total)
             self.flush()
