@@ -15,11 +15,11 @@ from selenium.webdriver.support.wait import WebDriverWait
 DRIVER_PATH = '/usr/local/bin/chromedriver'
 FILENAME = '/Users/andrewzhan/Projects/Gitlab/taobao_image_crawler/goods.txt'
 
-MONGODB_HOST = '10.16.169.177'
+MONGODB_HOST = 'localhost'
 MONGODB_PORT = 27017
 MONGODB_DB = 'scrapy_images'
-MONGODB_USER = 'qidun'
-MONGODB_PASS = 'Z0tPAyMToLSH'
+MONGODB_USER = ''
+MONGODB_PASS = ''
 MONGODB_COLLECTION = 'taobao'
 
 COOKIES = 'miid=9059030392035869736; cna=9GnBE24ycD4CAd3dHSVkcLka; hng=CN%7Czh-CN%7CCNY%7C156; thw=cn; tg=0; t=038c33ba8aab8ca768d40a6eab66d828; _uab_collina=154907493821998864468959; _cc_=V32FPkk%2Fhw%3D%3D; enc=RRC8ncbpfOZMLPZ4BSFYrLIXir1vtgtBd1%2BKcHsVHWDFvogyr8IpgJINMgLZUEEseQnXf4x6ARIfLYdrLweo4w%3D%3D; mt=ci%3D-1_1; l=bBIoM2gmvs3LDMJxBOCgSZarbNbOSIRxXuWbUoCHi_5HY18__u_OloNQWeJ62f5R_B8B4cyBlup9-etXv; v=0; cookie2=1e30f7364e78396b631135a64f4b3006; _tb_token_=3b38be343d9e6; alitrackid=www.taobao.com; lastalitrackid=www.taobao.com; _m_h5_tk=5ffeda61b0887d04525aef63d8f4e67b_1550642352420; _m_h5_tk_enc=129970ae40f2d3c69217d65f41765c7c; x5sec=7b227365617263686170703b32223a223362383538616534326638646565343336353033643066313365616261643539434f2b6875654d46454a6a47755a58676872694b4a686f4c4e6a63334e6a49344e4463774f7a453d227d; JSESSIONID=4F80A935E8CD3A935F35C09D1A66B5D2; isg=BFVVgevnpfoS1oa3qBUDP7JAZFcFUHIpLCbCbtf6AUwbLnUgn6ALNYXs_Ho9LiEc'
@@ -98,7 +98,9 @@ def set_driver():
     user_agent = RandomUserAgent()
     options.add_argument('user-agent={user_agent}'.format(user_agent=user_agent.randomly_select()))
     options.add_argument('--headless')
-    return webdriver.Chrome('{path}'.format(path=DRIVER_PATH), chrome_options=options)
+    chrome_driver = webdriver.Chrome('{path}'.format(path=DRIVER_PATH), chrome_options=options)
+    chrome_driver.implicitly_wait(10)
+    return chrome_driver
 
 
 def set_cookies(driver):
@@ -110,59 +112,65 @@ def set_cookies(driver):
         driver.add_cookie(cookie)
 
 
-def search_by_keyword(driver, word):
+def search_by_keyword(driver, word, start=None):
     def parse_detail_page(url, title):
-        driver.get(url)
-        wrapper_xpath = '//div[@id="description"]/div[contains(@class, "content")]'
-        image_xpath = wrapper_xpath + '//img'
-
-        # 滚动到class=content的div标签，触发异步加载
         try:
-            wrapper = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, image_xpath)))
-            ActionChains(driver).move_to_element(wrapper).perform()
-        except TimeoutException as e:
-            logging.error('Seems there is no image in the page (%s)' % url)
+            driver.get(url)
+        except TimeoutException:
+            logging.error('Timeout Exception occur when open page (%s)' % url)
         else:
-            # 获取所有图片，依次曝光
-            img_list = driver.find_elements_by_xpath(image_xpath)
-            index = 0
-            retry_times = 0
-            while True:
-                if index >= len(img_list):
-                    # 等待更多的图片加载，如果等待3次图片数量没有增加，退出循环
-                    retry_times = retry_times + 1
-                    if retry_times >= 3:
-                        break
-                    time.sleep(1)
-                else:
-                    retry_times = 0
-                    # 曝光每张图片
-                    ActionChains(driver).move_to_element(img_list[index]).perform()
-                    img_list = driver.find_elements_by_xpath(image_xpath)
-                    index = index + 1
+            wrapper_xpath = '//div[@id="description"]/div[contains(@class, "content")]'
+            image_xpath = wrapper_xpath + '//img'
 
-            # 取出当前页面的所有图片
-            images = driver.find_elements_by_xpath('//div[@id="description"]/div[contains(@class, "content")]//img')
-            logging.info('Found %d images from page %s.' % (len(images), url))
-            for index, image in enumerate(images):
-                image_info = {
-                    'url': image.get_attribute('src'),
-                    'title': title,
-                    'index': index + 1,
-                    'width': image.get_attribute('width'),
-                    'height': image.get_attribute('height'),
-                }
-                item = {
-                    'image_information': image_info,
-                    'search': word,
-                    'page_number': page + 1,
-                    'time': time.strftime('%Y-%m-%d', time.localtime(time.time())),
-                    'source_url': url
-                }
-                mongo.save_info(item)
+            # 滚动到class=content的div标签，触发异步加载
+            try:
+                wrapper = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, image_xpath)))
+                ActionChains(driver).move_to_element(wrapper).perform()
+            except TimeoutException:
+                logging.warning('Seems there is no image in the page (%s)' % url)
+            else:
+                # 获取所有图片，依次曝光
+                img_list = driver.find_elements_by_xpath(image_xpath)
+                index = 0
+                retry_times = 0
+                while True:
+                    if index >= len(img_list):
+                        # 等待更多的图片加载，如果等待3次图片数量没有增加，退出循环
+                        retry_times = retry_times + 1
+                        if retry_times >= 3:
+                            break
+                        time.sleep(1)
+                    else:
+                        retry_times = 0
+                        # 曝光每张图片
+                        ActionChains(driver).move_to_element(img_list[index]).perform()
+                        img_list = driver.find_elements_by_xpath(image_xpath)
+                        index = index + 1
+
+                # 取出当前页面的所有图片
+                images = driver.find_elements_by_xpath('//div[@id="description"]/div[contains(@class, "content")]//img')
+                logging.info('Found %d images from page %s.' % (len(images), url))
+                for index, image in enumerate(images):
+                    image_info = {
+                        'url': image.get_attribute('src'),
+                        'title': title,
+                        'index': index + 1,
+                        'width': image.get_attribute('width'),
+                        'height': image.get_attribute('height'),
+                    }
+                    item = {
+                        'image_information': image_info,
+                        'search': word,
+                        'page_number': page + 1,
+                        'time': time.strftime('%Y-%m-%d', time.localtime(time.time())),
+                        'source_url': url
+                    }
+                    mongo.save_info(item)
 
     for page in range(PAGE_NUMBER):
-        logging.info('Keyword: %s, page: %d, start crawling images.' % (word, page + 1))
+        if start and page + 1 < start:
+            continue
+        logging.info('Keyword: %s, page: %d, start crawling images' % (word, page + 1))
         paras = {
             'q': word,
             's': 44 * page
@@ -188,21 +196,25 @@ if __name__ == '__main__':
     mongo = MongoHelper()
 
     keywords = read_keywords_from_file(FILENAME)
-    logging.info('Read %d keywords from %s.' % (len(keywords), FILENAME))
+    logging.info('Read %d keywords from %s' % (len(keywords), FILENAME))
 
     driver = set_driver()
     driver.get('https://www.taobao.com')
     set_cookies(driver)
     time.sleep(2)
 
-    try:
-        # 根据关键词依次爬取
-        for index, word in enumerate(keywords):
-            logging.info('Keyword: %s, start searching images.' % word)
+    # try:
+    # 根据关键词依次爬取
+    start_page = 3
+    for index, word in enumerate(keywords[171:]):
+        logging.info('Keyword: %s, start searching images' % word)
+        if index == 0:
+            search_by_keyword(driver, word, start_page)
+        else:
             search_by_keyword(driver, word)
-            logging.info('Keyword: %s, images crawling finished.' % word)
-    except Exception as error:
-        logging.error(error)
-    finally:
-        driver.close()
-        mongo.close()
+        logging.info('Keyword: %s, images crawling finished' % word)
+    # except Exception as error:
+    #     logging.error(error)
+    # finally:
+    #     driver.close()
+    #     mongo.close()
