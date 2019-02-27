@@ -203,18 +203,18 @@ if __name__ == '__main__':
     set_cookies(driver)
     time.sleep(2)
 
-    # try:
-    # 根据关键词依次爬取
-    start_page = 3
-    for index, word in enumerate(keywords[171:]):
-        logging.info('Keyword: %s, start searching images' % word)
-        if index == 0:
-            search_by_keyword(driver, word, start_page)
-        else:
-            search_by_keyword(driver, word)
-        logging.info('Keyword: %s, images crawling finished' % word)
-    # except Exception as error:
-    #     logging.error(error)
-    # finally:
-    #     driver.close()
-    #     mongo.close()
+    try:
+        # 根据关键词依次爬取
+        start_page = 3
+        for index, word in enumerate(keywords[171:]):
+            logging.info('Keyword: %s, start searching images' % word)
+            if index == 0:
+                search_by_keyword(driver, word, start_page)
+            else:
+                search_by_keyword(driver, word)
+            logging.info('Keyword: %s, images crawling finished' % word)
+    except Exception as error:
+        logging.error(error)
+    finally:
+        driver.close()
+        mongo.close()
