@@ -4,11 +4,11 @@
 
 ### 实现
 #### 反爬机制
-* 淘宝搜索结果界面访问频次过高或不带cookie会被重定向到人机验证界面，淘宝前端js有逻辑验证chrome是否为webdriver启动，故拖拽验证目前无法破解
+* 淘宝搜索结果界面访问频次过高或不带cookie会被重定向到人机验证界面，淘宝前端js有逻辑验证chrome是否为webdriver启动，故拖拽验证目前无法破解。
 * 若爬虫cookie失效，需要手动打开淘宝搜索一个商品，将<a>https://s.taobao.com/search</a>接口request中的cookie复制粘贴到爬虫脚本中，重新启动即可。
-* 商品详情页反爬会弹出登录框或拖拽验证框，但html中仍能得到图片，目前不做处理
-* 详情页图片为js加载，需要模拟用户滚动到每一张图片触发加载，否则得到的是图片可能会是假地址
-* 必要时是可以搭建selenium集群避免反爬，参考<a>https://github.com/SeleniumHQ/docker-selenium</a>
+* 商品详情页反爬会弹出登录框或拖拽验证框，但html中仍能得到图片，目前不做处理。
+* 详情页图片为js加载，需要模拟用户滚动到每一张图片触发加载，否则得到的是图片可能会是假地址。
+* 必要时是可以搭建selenium集群避免反爬，参考<a>https://github.com/SeleniumHQ/docker-selenium</a>。
 
 #### 爬虫逻辑
 淘宝爬虫基于selenium + chromedriver实现，并未使用scrapy框架。<br>
