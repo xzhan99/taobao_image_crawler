@@ -248,8 +248,8 @@ if __name__ == '__main__':
 
     try:
         # 根据关键词依次爬取
-        start_page = 2
-        for index, word in enumerate(keywords[20:]):
+        start_page = 1
+        for index, word in enumerate(keywords):
             logging.info('Keyword: %s, start searching images' % word)
             if index == 0:
                 search_by_keyword(driver, word, start_page)
