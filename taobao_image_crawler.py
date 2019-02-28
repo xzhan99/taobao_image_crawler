@@ -13,14 +13,15 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
 DRIVER_PATH = '/usr/local/bin/chromedriver'
-FILENAME = '/Users/andrewzhan/Projects/Gitlab/taobao_image_crawler/goods.txt'
+REMOTE_DRIVER_PATH = 'http://35.189.0.73:4444/wd/hub'
+FILENAME = 'goods.txt'
 
 MONGODB_HOST = 'localhost'
 MONGODB_PORT = 27017
 MONGODB_DB = 'scrapy_images'
 MONGODB_USER = ''
 MONGODB_PASS = ''
-MONGODB_COLLECTION = 'taobao'
+MONGODB_COLLECTION = 'taobao_part2'
 
 COOKIES = 'miid=9059030392035869736; cna=9GnBE24ycD4CAd3dHSVkcLka; hng=CN%7Czh-CN%7CCNY%7C156; thw=cn; tg=0; t=038c33ba8aab8ca768d40a6eab66d828; _uab_collina=154907493821998864468959; _cc_=V32FPkk%2Fhw%3D%3D; enc=RRC8ncbpfOZMLPZ4BSFYrLIXir1vtgtBd1%2BKcHsVHWDFvogyr8IpgJINMgLZUEEseQnXf4x6ARIfLYdrLweo4w%3D%3D; mt=ci%3D-1_1; l=bBIoM2gmvs3LDMJxBOCgSZarbNbOSIRxXuWbUoCHi_5HY18__u_OloNQWeJ62f5R_B8B4cyBlup9-etXv; v=0; cookie2=1e30f7364e78396b631135a64f4b3006; _tb_token_=3b38be343d9e6; alitrackid=www.taobao.com; lastalitrackid=www.taobao.com; _m_h5_tk=5ffeda61b0887d04525aef63d8f4e67b_1550642352420; _m_h5_tk_enc=129970ae40f2d3c69217d65f41765c7c; x5sec=7b227365617263686170703b32223a223362383538616534326638646565343336353033643066313365616261643539434f2b6875654d46454a6a47755a58676872694b4a686f4c4e6a63334e6a49344e4463774f7a453d227d; JSESSIONID=4F80A935E8CD3A935F35C09D1A66B5D2; isg=BFVVgevnpfoS1oa3qBUDP7JAZFcFUHIpLCbCbtf6AUwbLnUgn6ALNYXs_Ho9LiEc'
 
@@ -30,6 +31,36 @@ PAGE_NUMBER = 3
 BUFFER_SIZE = 100
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+
+def filter_images(func):
+    """过滤掉爬虫爬取的非法图片
+
+    其中包括：假图片，用于换行的1x1像素图片，加载失败的图片
+
+    Args:
+        func: 需要使用装饰器处理非法数据的方法
+    Returns:
+        wapper: 被装饰的方法
+    """
+
+    def wrapper(*args, **kwargs):
+        mongo = args[0]
+        item = kwargs.get('item')
+        if isinstance(item, dict):
+            image_info = item['image_information']
+            logging.debug('Image filter receive the image %s' % image_info['url'])
+            if (image_info['width'] == '1' and image_info['width'] == '1') \
+                    or image_info['url'] is None \
+                    or image_info['url'] == 'https://img-tmdetail.alicdn.com/tps/i3/T1BYd_XwFcXXb9RTPq-90-90.png' \
+                    or image_info['url'] == 'https://img.alicdn.com/tps/i4/T10B2IXb4cXXcHmcPq-85-85.gif':
+                logging.warning('Image filter detect a illegal image %s' % image_info['url'])
+                return func(mongo, item=item, execute=False)
+            return func(mongo, item=item)
+        else:
+            logging.warning('Image filter received a object which is not dict type')
+
+    return wrapper
 
 
 class RandomUserAgent(object):
@@ -65,10 +96,12 @@ class MongoHelper(object):
         self.collection.insert_many(self.write_buffer)
         self.write_buffer = []
 
-    def save_info(self, item):
-        if isinstance(item, dict):
-            self.write_buffer.append(item)
-            self.total += 1
+    @filter_images
+    def save_info(self, item=None, execute=True):
+        if not execute:
+            return
+        self.write_buffer.append(item)
+        self.total += 1
         if len(self.write_buffer) >= BUFFER_SIZE:
             logging.info('MongoHelper buffer reached threshold, flushing data to MongoDB. '
                          '%d items have been saved in total' % self.total)
@@ -82,10 +115,12 @@ class MongoHelper(object):
 
 
 def read_keywords_from_file(filename):
-    """
-    从文件中读取关键词，用于淘宝搜索
-    :param filename: 文件路径
-    :return: 关键词列表
+    """从文件中读取关键词，用于淘宝搜索
+
+    Args:
+        filename: 文件路径
+    Returns:
+         keywords: 关键词列表
     """
     with open(filename, 'r') as file:
         lines = file.readlines()
@@ -98,7 +133,15 @@ def set_driver():
     user_agent = RandomUserAgent()
     options.add_argument('user-agent={user_agent}'.format(user_agent=user_agent.randomly_select()))
     options.add_argument('--headless')
-    chrome_driver = webdriver.Chrome('{path}'.format(path=DRIVER_PATH), chrome_options=options)
+    preferences = {
+        'profile.default_content_setting_values': {
+            'images': 2
+        }
+    }
+    options.add_experimental_option('prefs', preferences)
+    # chrome_driver = webdriver.Chrome('{path}'.format(path=DRIVER_PATH), chrome_options=options)
+    chrome_driver = webdriver.Remote(command_executor=REMOTE_DRIVER_PATH,
+                                     desired_capabilities=options.to_capabilities())
     chrome_driver.implicitly_wait(10)
     return chrome_driver
 
@@ -127,7 +170,7 @@ def search_by_keyword(driver, word, start=None):
                 wrapper = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, image_xpath)))
                 ActionChains(driver).move_to_element(wrapper).perform()
             except TimeoutException:
-                logging.warning('Seems there is no image in the page (%s)' % url)
+                logging.warning('Seems there is no image in the page %s' % url)
             else:
                 # 获取所有图片，依次曝光
                 img_list = driver.find_elements_by_xpath(image_xpath)
@@ -149,7 +192,7 @@ def search_by_keyword(driver, word, start=None):
 
                 # 取出当前页面的所有图片
                 images = driver.find_elements_by_xpath('//div[@id="description"]/div[contains(@class, "content")]//img')
-                logging.info('Found %d images from page %s.' % (len(images), url))
+                logging.info('Found %d images from page %s' % (len(images), url))
                 for index, image in enumerate(images):
                     image_info = {
                         'url': image.get_attribute('src'),
@@ -165,7 +208,7 @@ def search_by_keyword(driver, word, start=None):
                         'time': time.strftime('%Y-%m-%d', time.localtime(time.time())),
                         'source_url': url
                     }
-                    mongo.save_info(item)
+                    mongo.save_info(item=item)
 
     for page in range(PAGE_NUMBER):
         if start and page + 1 < start:
@@ -205,8 +248,8 @@ if __name__ == '__main__':
 
     try:
         # 根据关键词依次爬取
-        start_page = 3
-        for index, word in enumerate(keywords[171:]):
+        start_page = 2
+        for index, word in enumerate(keywords[20:]):
             logging.info('Keyword: %s, start searching images' % word)
             if index == 0:
                 search_by_keyword(driver, word, start_page)
