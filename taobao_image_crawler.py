@@ -39,9 +39,9 @@ def filter_images(func):
     其中包括：假图片，用于换行的1x1像素图片，加载失败的图片
 
     Args:
-        func: 需要使用装饰器处理非法数据的方法
+        func: 需要使用过滤器处理非法数据的方法
     Returns:
-        wapper: 被装饰的方法
+        wrapper: 带有过滤器的方法
     """
 
     def wrapper(*args, **kwargs):
@@ -54,8 +54,7 @@ def filter_images(func):
                     or image_info['url'] is None \
                     or image_info['url'] == 'https://img-tmdetail.alicdn.com/tps/i3/T1BYd_XwFcXXb9RTPq-90-90.png' \
                     or image_info['url'] == 'https://img.alicdn.com/tps/i4/T10B2IXb4cXXcHmcPq-85-85.gif':
-                logging.warning('Image filter detect a illegal image %s' % image_info['url'])
-                return func(mongo, item=item, execute=False)
+                return func(mongo, item=item, valid=False)
             return func(mongo, item=item)
         else:
             logging.warning('Image filter received a object which is not dict type')
@@ -97,8 +96,9 @@ class MongoHelper(object):
         self.write_buffer = []
 
     @filter_images
-    def save_info(self, item=None, execute=True):
-        if not execute:
+    def save_info(self, item=None, valid=True):
+        if not valid:
+            logging.warning('An invalid image has been detected %s' % item['image_information']['url'])
             return
         self.write_buffer.append(item)
         self.total += 1
@@ -249,7 +249,7 @@ if __name__ == '__main__':
     try:
         # 根据关键词依次爬取
         start_page = 1
-        for index, word in enumerate(keywords):
+        for index, word in enumerate(keywords[31:]):
             logging.info('Keyword: %s, start searching images' % word)
             if index == 0:
                 search_by_keyword(driver, word, start_page)
@@ -259,5 +259,5 @@ if __name__ == '__main__':
     except Exception as error:
         logging.error(error)
     finally:
-        driver.close()
         mongo.close()
+        driver.close()
