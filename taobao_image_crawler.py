@@ -12,13 +12,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
-DRIVER_PATH = '/usr/local/bin/chromedriver'
-REMOTE_DRIVER_PATH = 'http://35.189.0.73:4444/wd/hub'
+DRIVER_PATH = 'http://35.189.0.73:4444/wd/hub'
 FILENAME = 'goods.txt'
 
-MONGODB_HOST = 'localhost'
+MONGODB_HOST = '35.189.0.73'
 MONGODB_PORT = 27017
-MONGODB_DB = 'scrapy_images'
+MONGODB_DB = 'crawler'
 MONGODB_USER = ''
 MONGODB_PASS = ''
 MONGODB_COLLECTION = 'taobao_part2'
@@ -89,16 +88,16 @@ class MongoHelper(object):
         self.client = pymongo.MongoClient(url)
         self.db = self.client[MONGODB_DB]
         self.collection = self.db[MONGODB_COLLECTION]
-        self.write_buffer = []
+        self.write_buffer = list()
 
     def flush(self):
         self.collection.insert_many(self.write_buffer)
-        self.write_buffer = []
+        self.write_buffer.clear()
 
     @filter_images
     def save_info(self, item=None, valid=True):
         if not valid:
-            logging.warning('An invalid image has been detected %s' % item['image_information']['url'])
+            logging.info('An invalid image has been detected %s' % item['image_information']['url'])
             return
         self.write_buffer.append(item)
         self.total += 1
@@ -139,9 +138,12 @@ def set_driver():
         }
     }
     options.add_experimental_option('prefs', preferences)
-    # chrome_driver = webdriver.Chrome('{path}'.format(path=DRIVER_PATH), chrome_options=options)
-    chrome_driver = webdriver.Remote(command_executor=REMOTE_DRIVER_PATH,
-                                     desired_capabilities=options.to_capabilities())
+    # 判断所需要连接的webdriver是否在远端　
+    if DRIVER_PATH.startswith('http://'):
+        chrome_driver = webdriver.Remote(command_executor=DRIVER_PATH,
+                                         desired_capabilities=options.to_capabilities())
+    else:
+        chrome_driver = webdriver.Chrome(DRIVER_PATH, chrome_options=options)
     chrome_driver.implicitly_wait(10)
     return chrome_driver
 
@@ -249,7 +251,7 @@ if __name__ == '__main__':
     try:
         # 根据关键词依次爬取
         start_page = 1
-        for index, word in enumerate(keywords[31:]):
+        for index, word in enumerate(keywords):
             logging.info('Keyword: %s, start searching images' % word)
             if index == 0:
                 search_by_keyword(driver, word, start_page)
