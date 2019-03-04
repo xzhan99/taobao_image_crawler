@@ -12,7 +12,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
-DRIVER_PATH = 'http://35.189.0.73:4444/wd/hub'
+# DRIVER_PATH = 'http://35.189.0.73:4444/wd/hub'
+DRIVER_PATH = '/usr/local/bin/chromedriver'
 FILENAME = 'goods.txt'
 
 MONGODB_HOST = '35.189.0.73'
@@ -43,8 +44,7 @@ def filter_images(func):
         wrapper: 带有过滤器的方法
     """
 
-    def wrapper(*args, **kwargs):
-        mongo = args[0]
+    def wrapper(self, *args, **kwargs):
         item = kwargs.get('item')
         if isinstance(item, dict):
             image_info = item['image_information']
@@ -53,12 +53,49 @@ def filter_images(func):
                     or image_info['url'] is None \
                     or image_info['url'] == 'https://img-tmdetail.alicdn.com/tps/i3/T1BYd_XwFcXXb9RTPq-90-90.png' \
                     or image_info['url'] == 'https://img.alicdn.com/tps/i4/T10B2IXb4cXXcHmcPq-85-85.gif':
-                return func(mongo, item=item, valid=False)
-            return func(mongo, item=item)
+                return func(self, valid=False, *args, **kwargs)
+            return func(self, *args, **kwargs)
         else:
             logging.warning('Image filter received a object which is not dict type')
 
     return wrapper
+
+
+def retry(func):
+    """chromedriver异常重试3次
+
+    Args:
+        func: 需要重试的方法
+    Returns:
+        wrapper: 带有重试过滤器的方法
+    """
+    def wrapper(self, *args, **kwargs):
+        attempts = 0
+        while attempts < 3:
+            try:
+                return func(self, *args, **kwargs)
+            except TimeoutException:
+                logging.error('Timeout Exception occur when operate on chrome driver')
+                attempts += 1
+        # 三次均失败，重新获取driver对象后再重试依次
+        self.reinitialize_driver()
+        return func(self, *args, **kwargs)
+
+    return wrapper
+
+
+def read_keywords_from_file(filename):
+    """从文件中读取关键词，用于淘宝搜索
+
+    Args:
+        filename: 文件路径
+    Returns:
+         keywords: 关键词列表
+    """
+    with open(filename, 'r') as file:
+        lines = file.readlines()
+        keywords = [line.split(':')[0] for line in lines]
+    return keywords
 
 
 class RandomUserAgent(object):
@@ -74,11 +111,17 @@ class RandomUserAgent(object):
 
 
 class MongoHelper(object):
-    write_buffer = None
-    total = 0
+    client = None
+    db = None
+    collection = None
+    total = 0   # 入库图片总数
 
     def __init__(self):
         super(MongoHelper, self).__init__()
+        self.connect()
+        self.write_buffer = list()
+
+    def connect(self):
         username = urllib.parse.quote_plus(MONGODB_USER)
         password = urllib.parse.quote_plus(MONGODB_PASS)
         if username == '' and password == '':
@@ -88,11 +131,19 @@ class MongoHelper(object):
         self.client = pymongo.MongoClient(url)
         self.db = self.client[MONGODB_DB]
         self.collection = self.db[MONGODB_COLLECTION]
-        self.write_buffer = list()
+        logging.info('MongoDB client successfully connected to the server')
 
     def flush(self):
-        self.collection.insert_many(self.write_buffer)
-        self.write_buffer.clear()
+        try:
+            self.collection.insert_many(self.write_buffer)
+        except pymongo.errors.ServerSelectionTimeoutError:
+            logging.error('MongoDB connection lost, trying to reconnect')
+            # 重连数据库
+            self.connect()
+            # 连接后重试
+            self.collection.insert_many(self.write_buffer)
+        else:
+            self.write_buffer.clear()
 
     @filter_images
     def save_info(self, item=None, valid=True):
@@ -113,69 +164,79 @@ class MongoHelper(object):
         self.client.close()
 
 
-def read_keywords_from_file(filename):
-    """从文件中读取关键词，用于淘宝搜索
+class HeadlessChrome(object):
+    driver = None
+    mongo = None
 
-    Args:
-        filename: 文件路径
-    Returns:
-         keywords: 关键词列表
-    """
-    with open(filename, 'r') as file:
-        lines = file.readlines()
-        keywords = [line.split(':')[0] for line in lines]
-    return keywords
+    def __init__(self, mongo):
+        self.mongo = mongo
+        self.set_driver()
+        self.set_cookies()
 
-
-def set_driver():
-    options = webdriver.ChromeOptions()
-    user_agent = RandomUserAgent()
-    options.add_argument('user-agent={user_agent}'.format(user_agent=user_agent.randomly_select()))
-    options.add_argument('--headless')
-    preferences = {
-        'profile.default_content_setting_values': {
-            'images': 2
+    def set_driver(self):
+        options = webdriver.ChromeOptions()
+        user_agent = RandomUserAgent()
+        options.add_argument('user-agent={user_agent}'.format(user_agent=user_agent.randomly_select()))
+        options.add_argument('--headless')
+        preferences = {
+            'profile.default_content_setting_values': {
+                'images': 2
+            }
         }
-    }
-    options.add_experimental_option('prefs', preferences)
-    # 判断所需要连接的webdriver是否在远端　
-    if DRIVER_PATH.startswith('http://'):
-        chrome_driver = webdriver.Remote(command_executor=DRIVER_PATH,
-                                         desired_capabilities=options.to_capabilities())
-    else:
-        chrome_driver = webdriver.Chrome(DRIVER_PATH, chrome_options=options)
-    chrome_driver.implicitly_wait(10)
-    return chrome_driver
-
-
-def set_cookies(driver):
-    driver.delete_all_cookies()
-    for cookie in COOKIES.split(';'):
-        name, value = cookie.strip().split('=', 1)
-        domain = '.taobao.com'
-        cookie = {'name': name, 'value': value, 'domain': domain}
-        driver.add_cookie(cookie)
-
-
-def search_by_keyword(driver, word, start=None):
-    def parse_detail_page(url, title):
-        try:
-            driver.get(url)
-        except TimeoutException:
-            logging.error('Timeout Exception occur when open page (%s)' % url)
+        options.add_experimental_option('prefs', preferences)
+        # 判断所需要连接的webdriver是否在远端　
+        if DRIVER_PATH.startswith('http://'):
+            chrome_driver = webdriver.Remote(command_executor=DRIVER_PATH,
+                                             desired_capabilities=options.to_capabilities())
+            logging.info('Connected to remote driver on cloud %s' % DRIVER_PATH)
         else:
+            chrome_driver = webdriver.Chrome(DRIVER_PATH, chrome_options=options)
+            logging.info('Connected to local chrome driver %s' % DRIVER_PATH)
+        chrome_driver.implicitly_wait(10)
+        self.driver = chrome_driver
+
+    def set_cookies(self):
+        self.driver.get('https://www.taobao.com')
+        self.driver.delete_all_cookies()
+        for cookie in COOKIES.split(';'):
+            name, value = cookie.strip().split('=', 1)
+            domain = '.taobao.com'
+            cookie = {'name': name, 'value': value, 'domain': domain}
+            self.driver.add_cookie(cookie)
+        logging.info('Chrome driver finished setting cookies')
+
+    @retry
+    def get(self, url):
+        self.driver.get(url)
+
+    @retry
+    def find_elements_by_xpath(self, xpath):
+        return self.driver.find_elements_by_xpath(xpath)
+
+    def reinitialize_driver(self):
+        self.driver.close()
+        self.set_driver()
+        self.set_cookies()
+
+    def close(self):
+        self.driver.close()
+
+    def search_by_keyword(self, word, start=None):
+        def parse_detail_page(url, title):
+            self.get(url)
             wrapper_xpath = '//div[@id="description"]/div[contains(@class, "content")]'
             image_xpath = wrapper_xpath + '//img'
 
             # 滚动到class=content的div标签，触发异步加载
             try:
-                wrapper = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, image_xpath)))
-                ActionChains(driver).move_to_element(wrapper).perform()
+                wrapper = WebDriverWait(self.driver, 10).until(
+                    EC.presence_of_element_located((By.XPATH, image_xpath)))
+                ActionChains(self.driver).move_to_element(wrapper).perform()
             except TimeoutException:
                 logging.warning('Seems there is no image in the page %s' % url)
             else:
                 # 获取所有图片，依次曝光
-                img_list = driver.find_elements_by_xpath(image_xpath)
+                img_list = self.find_elements_by_xpath(image_xpath)
                 index = 0
                 retry_times = 0
                 while True:
@@ -188,12 +249,13 @@ def search_by_keyword(driver, word, start=None):
                     else:
                         retry_times = 0
                         # 曝光每张图片
-                        ActionChains(driver).move_to_element(img_list[index]).perform()
-                        img_list = driver.find_elements_by_xpath(image_xpath)
+                        ActionChains(self.driver).move_to_element(img_list[index]).perform()
+                        img_list = self.find_elements_by_xpath(image_xpath)
                         index = index + 1
 
                 # 取出当前页面的所有图片
-                images = driver.find_elements_by_xpath('//div[@id="description"]/div[contains(@class, "content")]//img')
+                images = self.find_elements_by_xpath(
+                    '//div[@id="description"]/div[contains(@class, "content")]//img')
                 logging.info('Found %d images from page %s' % (len(images), url))
                 for index, image in enumerate(images):
                     image_info = {
@@ -210,56 +272,49 @@ def search_by_keyword(driver, word, start=None):
                         'time': time.strftime('%Y-%m-%d', time.localtime(time.time())),
                         'source_url': url
                     }
-                    mongo.save_info(item=item)
+                    self.mongo.save_info(item=item)
 
-    for page in range(PAGE_NUMBER):
-        if start and page + 1 < start:
-            continue
-        logging.info('Keyword: %s, page: %d, start crawling images' % (word, page + 1))
-        paras = {
-            'q': word,
-            's': 44 * page
-        }
-        base_url = 'https://s.taobao.com/search?'
-        # 生成商品列表页url
-        url = base_url + urlencode(paras)
-        driver.get(url)
+        for page in range(PAGE_NUMBER):
+            if start and page + 1 < start:
+                continue
+            logging.info('Keyword: %s, page: %d, start crawling images' % (word, page + 1))
+            paras = {
+                'q': word,
+                's': 44 * page
+            }
+            base_url = 'https://s.taobao.com/search?'
+            # 生成商品列表页url
+            url = base_url + urlencode(paras)
+            self.get(url)
 
-        # xpath提取页面中的每个商品url
-        goods = driver.find_elements_by_xpath(
-            '//div[@id= "mainsrp-itemlist"]//div[@class="items"]//div[@class="pic"]/a')
-        good_urls = []
-        for good in goods:
-            good_urls.append((good.get_attribute('href'), good.find_element_by_xpath('./img').get_attribute('alt')))
+            # xpath提取页面中的每个商品url
+            goods = self.find_elements_by_xpath(
+                '//div[@id= "mainsrp-itemlist"]//div[@class="items"]//div[@class="pic"]/a')
+            good_urls = []
+            for good in goods:
+                good_urls.append((good.get_attribute('href'), good.find_element_by_xpath('./img').get_attribute('alt')))
 
-        # 依次爬取每个详情页中的图片
-        for url, title in good_urls:
-            parse_detail_page(url, title)
+            # 依次爬取每个详情页中的图片
+            for url, title in good_urls:
+                parse_detail_page(url, title)
 
 
 if __name__ == '__main__':
     mongo = MongoHelper()
+    driver = HeadlessChrome(mongo)
 
     keywords = read_keywords_from_file(FILENAME)
     logging.info('Read %d keywords from %s' % (len(keywords), FILENAME))
 
-    driver = set_driver()
-    driver.get('https://www.taobao.com')
-    set_cookies(driver)
-    time.sleep(2)
+    # 根据关键词依次爬取
+    start_page = 1
+    for index, word in enumerate(keywords):
+        logging.info('Keyword: %s, start searching images' % word)
+        if index == 0:
+            HeadlessChrome.search_by_keyword(driver, word, start_page)
+        else:
+            HeadlessChrome.search_by_keyword(driver, word)
+        logging.info('Keyword: %s, images crawling finished' % word)
 
-    try:
-        # 根据关键词依次爬取
-        start_page = 1
-        for index, word in enumerate(keywords):
-            logging.info('Keyword: %s, start searching images' % word)
-            if index == 0:
-                search_by_keyword(driver, word, start_page)
-            else:
-                search_by_keyword(driver, word)
-            logging.info('Keyword: %s, images crawling finished' % word)
-    except Exception as error:
-        logging.error(error)
-    finally:
-        mongo.close()
-        driver.close()
+    mongo.close()
+    driver.close()
