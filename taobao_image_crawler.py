@@ -1,12 +1,12 @@
 import logging
 import time
 import urllib
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import pymongo
 from fake_useragent import UserAgent
 from selenium import webdriver
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -21,23 +21,22 @@ MONGODB_PORT = 27017
 MONGODB_DB = 'crawler'
 MONGODB_USER = ''
 MONGODB_PASS = ''
-MONGODB_COLLECTION = 'taobao_part2'
+MONGODB_COLLECTION = 'taobao_part3'
 
-COOKIES = 'miid=9059030392035869736; cna=9GnBE24ycD4CAd3dHSVkcLka; hng=CN%7Czh-CN%7CCNY%7C156; thw=cn; tg=0; t=038c33ba8aab8ca768d40a6eab66d828; _uab_collina=154907493821998864468959; _cc_=V32FPkk%2Fhw%3D%3D; enc=RRC8ncbpfOZMLPZ4BSFYrLIXir1vtgtBd1%2BKcHsVHWDFvogyr8IpgJINMgLZUEEseQnXf4x6ARIfLYdrLweo4w%3D%3D; mt=ci%3D-1_1; l=bBIoM2gmvs3LDMJxBOCgSZarbNbOSIRxXuWbUoCHi_5HY18__u_OloNQWeJ62f5R_B8B4cyBlup9-etXv; v=0; cookie2=1e30f7364e78396b631135a64f4b3006; _tb_token_=3b38be343d9e6; alitrackid=www.taobao.com; lastalitrackid=www.taobao.com; _m_h5_tk=5ffeda61b0887d04525aef63d8f4e67b_1550642352420; _m_h5_tk_enc=129970ae40f2d3c69217d65f41765c7c; x5sec=7b227365617263686170703b32223a223362383538616534326638646565343336353033643066313365616261643539434f2b6875654d46454a6a47755a58676872694b4a686f4c4e6a63334e6a49344e4463774f7a453d227d; JSESSIONID=4F80A935E8CD3A935F35C09D1A66B5D2; isg=BFVVgevnpfoS1oa3qBUDP7JAZFcFUHIpLCbCbtf6AUwbLnUgn6ALNYXs_Ho9LiEc'
+# COOKIES = 'miid=9059030392035869736; cna=9GnBE24ycD4CAd3dHSVkcLka; hng=CN%7Czh-CN%7CCNY%7C156; thw=cn; tg=0; t=038c33ba8aab8ca768d40a6eab66d828; _uab_collina=154907493821998864468959; _cc_=V32FPkk%2Fhw%3D%3D; enc=RRC8ncbpfOZMLPZ4BSFYrLIXir1vtgtBd1%2BKcHsVHWDFvogyr8IpgJINMgLZUEEseQnXf4x6ARIfLYdrLweo4w%3D%3D; mt=ci%3D-1_1; l=bBIoM2gmvs3LDMJxBOCgSZarbNbOSIRxXuWbUoCHi_5HY18__u_OloNQWeJ62f5R_B8B4cyBlup9-etXv; v=0; cookie2=1e30f7364e78396b631135a64f4b3006; _tb_token_=3b38be343d9e6; alitrackid=www.taobao.com; lastalitrackid=www.taobao.com; _m_h5_tk=5ffeda61b0887d04525aef63d8f4e67b_1550642352420; _m_h5_tk_enc=129970ae40f2d3c69217d65f41765c7c; x5sec=7b227365617263686170703b32223a223362383538616534326638646565343336353033643066313365616261643539434f2b6875654d46454a6a47755a58676872694b4a686f4c4e6a63334e6a49344e4463774f7a453d227d; JSESSIONID=4F80A935E8CD3A935F35C09D1A66B5D2; isg=BFVVgevnpfoS1oa3qBUDP7JAZFcFUHIpLCbCbtf6AUwbLnUgn6ALNYXs_Ho9LiEc'
+COOKIES = 'miid=578991192189112348; tracknick=xzhan99; tg=0; enc=ESiYgb3SfqXlNEuyIU7Nlgl0OWP42Rk6YSopjbD9KNP7C%2Bi2agnAnrOz3cYq8pwHvshc6w9YX57ezxXREeHbyg%3D%3D; x=e%3D1%26p%3D*%26s%3D0%26c%3D0%26f%3D0%26g%3D0%26t%3D0%26__ll%3D-1%26_ato%3D0; _cc_=W5iHLLyFfA%3D%3D; t=a19bc882aaba114fcf11893ee8c11e06; l=bBg4exwnvslWeTe_BOfCIZazn87TuIRb4oVPhdvXGICPO0fHRq_OWZNeujLMC3GNw1W2R3kVQl7TBeYBq_C..; _fbp=fb.1.1550738310686.1258164823; hng=CN%7Czh-CN%7CCNY%7C156; v=0; cookie2=174b214a8924c091f04ffbd7d94300f0; _tb_token_=3775b3b7a1b4; isg=BLm5RbbfwdIIn5pkOaaDl-fNyCWZxM96ML8uv9vuMuBfYtv0KRa9SCfw4X6UX0Ww'
 
 # 每个关键词爬取3页
 PAGE_NUMBER = 3
 # 缓冲区大小，达到100条数据写入mongodb
-BUFFER_SIZE = 100
+BUFFER_SIZE = 50
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
-def filter_images(func):
+def image_filter(func):
     """过滤掉爬虫爬取的非法图片
-
     其中包括：假图片，用于换行的1x1像素图片，加载失败的图片
-
     Args:
         func: 需要使用过滤器处理非法数据的方法
     Returns:
@@ -61,32 +60,27 @@ def filter_images(func):
     return wrapper
 
 
-def retry(func):
+def timeout_handler(func):
     """chromedriver异常重试3次
-
     Args:
         func: 需要重试的方法
     Returns:
         wrapper: 带有重试过滤器的方法
     """
+
     def wrapper(self, *args, **kwargs):
-        attempts = 0
-        while attempts < 3:
-            try:
-                return func(self, *args, **kwargs)
-            except TimeoutException:
-                logging.error('Timeout Exception occur when operate on chrome driver')
-                attempts += 1
-        # 三次均失败，重新获取driver对象后再重试依次
-        self.reinitialize_driver()
-        return func(self, *args, **kwargs)
+        try:
+            return func(self, *args, **kwargs)
+        except WebDriverException as error:
+            logging.error('Exception occur when operate on chrome driver %s' % error.__class__)
+            self.reinitialize_driver()
+            return False
 
     return wrapper
 
 
 def read_keywords_from_file(filename):
     """从文件中读取关键词，用于淘宝搜索
-
     Args:
         filename: 文件路径
     Returns:
@@ -114,7 +108,7 @@ class MongoHelper(object):
     client = None
     db = None
     collection = None
-    total = 0   # 入库图片总数
+    total = 0  # 入库图片总数
 
     def __init__(self):
         super(MongoHelper, self).__init__()
@@ -134,19 +128,13 @@ class MongoHelper(object):
         logging.info('MongoDB client successfully connected to the server')
 
     def flush(self):
-        try:
-            self.collection.insert_many(self.write_buffer)
-        except pymongo.errors.ServerSelectionTimeoutError:
-            logging.error('MongoDB connection lost, trying to reconnect')
-            # 重连数据库
-            self.connect()
-            # 连接后重试
-            self.collection.insert_many(self.write_buffer)
-        else:
-            self.write_buffer.clear()
+        """ 将缓冲区中的数据存入数据库 """
+        self.collection.insert_many(self.write_buffer)
+        self.write_buffer.clear()
 
-    @filter_images
+    @image_filter
     def save_info(self, item=None, valid=True):
+        """ 将有效数据放入缓冲区 """
         if not valid:
             logging.info('An invalid image has been detected %s' % item['image_information']['url'])
             return
@@ -165,19 +153,25 @@ class MongoHelper(object):
 
 
 class HeadlessChrome(object):
-    driver = None
     mongo = None
+    driver = None
+    main_window = None  # 当前正在操作的tab
+    windows = None  # 所有tab
 
     def __init__(self, mongo):
         self.mongo = mongo
         self.set_driver()
+        self.set_window_handler()
         self.set_cookies()
 
     def set_driver(self):
         options = webdriver.ChromeOptions()
         user_agent = RandomUserAgent()
         options.add_argument('user-agent={user_agent}'.format(user_agent=user_agent.randomly_select()))
+        options.add_argument("disable-infobars")
+        options.add_argument("disable-web-security")
         options.add_argument('--headless')
+        options.add_argument('--no-sandbox')
         preferences = {
             'profile.default_content_setting_values': {
                 'images': 2
@@ -193,10 +187,19 @@ class HeadlessChrome(object):
             chrome_driver = webdriver.Chrome(DRIVER_PATH, chrome_options=options)
             logging.info('Connected to local chrome driver %s' % DRIVER_PATH)
         chrome_driver.implicitly_wait(10)
+        chrome_driver.set_page_load_timeout(30)
         self.driver = chrome_driver
 
+    def set_window_handler(self):
+        self.main_window = self.driver.current_window_handle  # 记录当前窗口的句柄
+        self.driver.execute_script('window.open("https://www.google.com.au");')
+        self.windows = self.driver.window_handles
+        logging.info('New backup window has been opened')
+        self.driver.switch_to.window(self.main_window)
+        logging.info('Switched to main window')
+
     def set_cookies(self):
-        self.driver.get('https://www.taobao.com')
+        self.driver.get('https://www.google.com.au')
         self.driver.delete_all_cookies()
         for cookie in COOKIES.split(';'):
             name, value = cookie.strip().split('=', 1)
@@ -205,30 +208,49 @@ class HeadlessChrome(object):
             self.driver.add_cookie(cookie)
         logging.info('Chrome driver finished setting cookies')
 
-    @retry
+    @timeout_handler
     def get(self, url):
         self.driver.get(url)
 
-    @retry
+    @timeout_handler
     def find_elements_by_xpath(self, xpath):
         return self.driver.find_elements_by_xpath(xpath)
 
     def reinitialize_driver(self):
-        self.driver.close()
-        self.set_driver()
-        self.set_cookies()
+        """ chrome driver抛出Timeout Exception后，会导致之后的页面页无法正常加载，处理方法为：
+            1. 关闭当前tab
+            2. 切换到备用的tab加载剩余界面
+            3. 打开另一个新的tab作为备用
+        """
+        for window in self.windows:
+            if self.main_window != window:
+                self.driver.close()
+                self.driver.switch_to.window(window)
+                self.main_window = window
+                logging.info('Chrome driver has changed to a new tab')
+                break
+        self.driver.execute_script('window.open("https://www.google.com.au");')
+        self.windows = self.driver.window_handles
+        logging.info('New backup window has been prepared well')
 
     def close(self):
-        self.driver.close()
+        self.driver.quit()
 
     def search_by_keyword(self, word, start=None):
         def parse_detail_page(url, title):
-            self.get(url)
-            wrapper_xpath = '//div[@id="description"]/div[contains(@class, "content")]'
-            image_xpath = wrapper_xpath + '//img'
+            if self.get(url) is False:
+                logging.error('Failed to load page %s' % url)
+                return
+            item_image_xpath = '//div[@id="description"]/div[contains(@class, "content")]//img'
+            paima_image_xpath = '//div[@id="J_desc_content"]//img'
 
             # 滚动到class=content的div标签，触发异步加载
             try:
+                domain = urlparse(self.driver.current_url).netloc
+                if domain == 'item-paimai.taobao.com':
+                    image_xpath = paima_image_xpath
+                else:
+                    image_xpath = item_image_xpath
                 wrapper = WebDriverWait(self.driver, 10).until(
                     EC.presence_of_element_located((By.XPATH, image_xpath)))
                 ActionChains(self.driver).move_to_element(wrapper).perform()
@@ -237,6 +259,8 @@ class HeadlessChrome(object):
             else:
                 # 获取所有图片，依次曝光
                 img_list = self.find_elements_by_xpath(image_xpath)
+                if not img_list:
+                    return
                 index = 0
                 retry_times = 0
                 while True:
@@ -251,11 +275,16 @@ class HeadlessChrome(object):
                         # 曝光每张图片
                         ActionChains(self.driver).move_to_element(img_list[index]).perform()
                         img_list = self.find_elements_by_xpath(image_xpath)
+                        if not img_list:
+                            return
                         index = index + 1
 
                 # 取出当前页面的所有图片
                 images = self.find_elements_by_xpath(
                     '//div[@id="description"]/div[contains(@class, "content")]//img')
+                if not images:
+                    logging.info('No images found from page %s' % url)
+                    return
                 logging.info('Found %d images from page %s' % (len(images), url))
                 for index, image in enumerate(images):
                     image_info = {
@@ -285,11 +314,16 @@ class HeadlessChrome(object):
             base_url = 'https://s.taobao.com/search?'
             # 生成商品列表页url
             url = base_url + urlencode(paras)
-            self.get(url)
+            if self.get(url) is False:
+                logging.error('Failed to load page %s' % url)
+                continue
 
             # xpath提取页面中的每个商品url
             goods = self.find_elements_by_xpath(
                 '//div[@id= "mainsrp-itemlist"]//div[@class="items"]//div[@class="pic"]/a')
+            if not goods:
+                logging.info('No good found from page %s' % url)
+                continue
             good_urls = []
             for good in goods:
                 good_urls.append((good.get_attribute('href'), good.find_element_by_xpath('./img').get_attribute('alt')))
@@ -308,7 +342,7 @@ if __name__ == '__main__':
 
     # 根据关键词依次爬取
     start_page = 1
-    for index, word in enumerate(keywords):
+    for index, word in enumerate(keywords[53:]):
         logging.info('Keyword: %s, start searching images' % word)
         if index == 0:
             HeadlessChrome.search_by_keyword(driver, word, start_page)
