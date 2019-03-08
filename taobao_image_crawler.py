@@ -75,7 +75,7 @@ def timeout_handler(func):
                 return func(self, *args, **kwargs)
             except WebDriverException as error:
                 logging.error(
-                    'Exception (times: %d) occur when operate on chrome driver %s' % (retries, error.__class__))
+                    'Exception (times: %d) occur when operate on chrome driver %s' % (retries + 1, error.__class__))
                 self.reinitialize_driver()
                 if retries >= 1:
                     return False
