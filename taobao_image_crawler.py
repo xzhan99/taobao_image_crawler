@@ -21,10 +21,10 @@ MONGODB_PORT = 27017
 MONGODB_DB = 'crawler'
 MONGODB_USER = ''
 MONGODB_PASS = ''
-MONGODB_COLLECTION = 'taobao_part3'
+MONGODB_COLLECTION = 'taobao_part3_new'
 
-# COOKIES = 'miid=9059030392035869736; cna=9GnBE24ycD4CAd3dHSVkcLka; hng=CN%7Czh-CN%7CCNY%7C156; thw=cn; tg=0; t=038c33ba8aab8ca768d40a6eab66d828; _uab_collina=154907493821998864468959; _cc_=V32FPkk%2Fhw%3D%3D; enc=RRC8ncbpfOZMLPZ4BSFYrLIXir1vtgtBd1%2BKcHsVHWDFvogyr8IpgJINMgLZUEEseQnXf4x6ARIfLYdrLweo4w%3D%3D; mt=ci%3D-1_1; l=bBIoM2gmvs3LDMJxBOCgSZarbNbOSIRxXuWbUoCHi_5HY18__u_OloNQWeJ62f5R_B8B4cyBlup9-etXv; v=0; cookie2=1e30f7364e78396b631135a64f4b3006; _tb_token_=3b38be343d9e6; alitrackid=www.taobao.com; lastalitrackid=www.taobao.com; _m_h5_tk=5ffeda61b0887d04525aef63d8f4e67b_1550642352420; _m_h5_tk_enc=129970ae40f2d3c69217d65f41765c7c; x5sec=7b227365617263686170703b32223a223362383538616534326638646565343336353033643066313365616261643539434f2b6875654d46454a6a47755a58676872694b4a686f4c4e6a63334e6a49344e4463774f7a453d227d; JSESSIONID=4F80A935E8CD3A935F35C09D1A66B5D2; isg=BFVVgevnpfoS1oa3qBUDP7JAZFcFUHIpLCbCbtf6AUwbLnUgn6ALNYXs_Ho9LiEc'
-COOKIES = 'miid=578991192189112348; tracknick=xzhan99; tg=0; enc=ESiYgb3SfqXlNEuyIU7Nlgl0OWP42Rk6YSopjbD9KNP7C%2Bi2agnAnrOz3cYq8pwHvshc6w9YX57ezxXREeHbyg%3D%3D; x=e%3D1%26p%3D*%26s%3D0%26c%3D0%26f%3D0%26g%3D0%26t%3D0%26__ll%3D-1%26_ato%3D0; _cc_=W5iHLLyFfA%3D%3D; t=a19bc882aaba114fcf11893ee8c11e06; l=bBg4exwnvslWeTe_BOfCIZazn87TuIRb4oVPhdvXGICPO0fHRq_OWZNeujLMC3GNw1W2R3kVQl7TBeYBq_C..; _fbp=fb.1.1550738310686.1258164823; hng=CN%7Czh-CN%7CCNY%7C156; v=0; cookie2=174b214a8924c091f04ffbd7d94300f0; _tb_token_=3775b3b7a1b4; isg=BLm5RbbfwdIIn5pkOaaDl-fNyCWZxM96ML8uv9vuMuBfYtv0KRa9SCfw4X6UX0Ww'
+COOKIES = 'miid=9059030392035869736; cna=9GnBE24ycD4CAd3dHSVkcLka; hng=CN%7Czh-CN%7CCNY%7C156; thw=cn; tg=0; t=038c33ba8aab8ca768d40a6eab66d828; _uab_collina=154907493821998864468959; _cc_=V32FPkk%2Fhw%3D%3D; enc=RRC8ncbpfOZMLPZ4BSFYrLIXir1vtgtBd1%2BKcHsVHWDFvogyr8IpgJINMgLZUEEseQnXf4x6ARIfLYdrLweo4w%3D%3D; mt=ci%3D-1_1; l=bBIoM2gmvs3LDMJxBOCgSZarbNbOSIRxXuWbUoCHi_5HY18__u_OloNQWeJ62f5R_B8B4cyBlup9-etXv; v=0; cookie2=1e30f7364e78396b631135a64f4b3006; _tb_token_=3b38be343d9e6; alitrackid=www.taobao.com; lastalitrackid=www.taobao.com; _m_h5_tk=5ffeda61b0887d04525aef63d8f4e67b_1550642352420; _m_h5_tk_enc=129970ae40f2d3c69217d65f41765c7c; x5sec=7b227365617263686170703b32223a223362383538616534326638646565343336353033643066313365616261643539434f2b6875654d46454a6a47755a58676872694b4a686f4c4e6a63334e6a49344e4463774f7a453d227d; JSESSIONID=4F80A935E8CD3A935F35C09D1A66B5D2; isg=BFVVgevnpfoS1oa3qBUDP7JAZFcFUHIpLCbCbtf6AUwbLnUgn6ALNYXs_Ho9LiEc'
+# COOKIES = 'miid=578991192189112348; tracknick=xzhan99; tg=0; enc=ESiYgb3SfqXlNEuyIU7Nlgl0OWP42Rk6YSopjbD9KNP7C%2Bi2agnAnrOz3cYq8pwHvshc6w9YX57ezxXREeHbyg%3D%3D; x=e%3D1%26p%3D*%26s%3D0%26c%3D0%26f%3D0%26g%3D0%26t%3D0%26__ll%3D-1%26_ato%3D0; _cc_=W5iHLLyFfA%3D%3D; t=a19bc882aaba114fcf11893ee8c11e06; l=bBg4exwnvslWeTe_BOfCIZazn87TuIRb4oVPhdvXGICPO0fHRq_OWZNeujLMC3GNw1W2R3kVQl7TBeYBq_C..; _fbp=fb.1.1550738310686.1258164823; hng=CN%7Czh-CN%7CCNY%7C156; v=0; cookie2=174b214a8924c091f04ffbd7d94300f0; _tb_token_=3775b3b7a1b4; isg=BLm5RbbfwdIIn5pkOaaDl-fNyCWZxM96ML8uv9vuMuBfYtv0KRa9SCfw4X6UX0Ww'
 
 # 每个关键词爬取3页
 PAGE_NUMBER = 3
@@ -61,7 +61,8 @@ def image_filter(func):
 
 
 def timeout_handler(func):
-    """chromedriver异常重试3次
+    """chromedriver Timeout处理，出现Timeout Exception会导致之后的页面也报这个错误
+    解决方法是打开一个标签作为备用，在出现该异常是关闭当前标签，切换到备用标签重试1次，再继续访问其他页面
     Args:
         func: 需要重试的方法
     Returns:
@@ -69,12 +70,15 @@ def timeout_handler(func):
     """
 
     def wrapper(self, *args, **kwargs):
-        try:
-            return func(self, *args, **kwargs)
-        except WebDriverException as error:
-            logging.error('Exception occur when operate on chrome driver %s' % error.__class__)
-            self.reinitialize_driver()
-            return False
+        for retries in range(2):
+            try:
+                return func(self, *args, **kwargs)
+            except WebDriverException as error:
+                logging.error(
+                    'Exception (times: %d) occur when operate on chrome driver %s' % (retries, error.__class__))
+                self.reinitialize_driver()
+                if retries >= 1:
+                    return False
 
     return wrapper
 
@@ -128,13 +132,13 @@ class MongoHelper(object):
         logging.info('MongoDB client successfully connected to the server')
 
     def flush(self):
-        """ 将缓冲区中的数据存入数据库 """
+        """将缓冲区中的数据存入数据库"""
         self.collection.insert_many(self.write_buffer)
         self.write_buffer.clear()
 
     @image_filter
     def save_info(self, item=None, valid=True):
-        """ 将有效数据放入缓冲区 """
+        """将有效数据放入缓冲区"""
         if not valid:
             logging.info('An invalid image has been detected %s' % item['image_information']['url'])
             return
@@ -172,6 +176,7 @@ class HeadlessChrome(object):
         options.add_argument("disable-web-security")
         options.add_argument('--headless')
         options.add_argument('--no-sandbox')
+        # 配置chromedriver不加载图片
         preferences = {
             'profile.default_content_setting_values': {
                 'images': 2
@@ -229,15 +234,17 @@ class HeadlessChrome(object):
                 self.main_window = window
                 logging.info('Chrome driver has changed to a new tab')
                 break
+        # 在新的标签中打开google
         self.driver.execute_script('window.open("https://www.google.com.au");')
         self.windows = self.driver.window_handles
-        logging.info('New backup window has been prepared well')
+        logging.info('New backup tab has been opened')
 
     def close(self):
         self.driver.quit()
 
     def search_by_keyword(self, word, start=None):
         def parse_detail_page(url, title):
+            """爬取宝贝详情页中的图片"""
             if self.get(url) is False:
                 logging.error('Failed to load page %s' % url)
                 return
@@ -303,6 +310,7 @@ class HeadlessChrome(object):
                     }
                     self.mongo.save_info(item=item)
 
+        failed_times = 0
         for page in range(PAGE_NUMBER):
             if start and page + 1 < start:
                 continue
@@ -316,13 +324,18 @@ class HeadlessChrome(object):
             url = base_url + urlencode(paras)
             if self.get(url) is False:
                 logging.error('Failed to load page %s' % url)
+                failed_times += 1
+                if failed_times >= 2:
+                    raise TimeoutException
                 continue
 
+            failed_times = 0
             # xpath提取页面中的每个商品url
             goods = self.find_elements_by_xpath(
                 '//div[@id= "mainsrp-itemlist"]//div[@class="items"]//div[@class="pic"]/a')
             if not goods:
                 logging.info('No good found from page %s' % url)
+                time.sleep(300)
                 continue
             good_urls = []
             for good in goods:
@@ -342,7 +355,7 @@ if __name__ == '__main__':
 
     # 根据关键词依次爬取
     start_page = 1
-    for index, word in enumerate(keywords[53:]):
+    for index, word in enumerate(keywords):
         logging.info('Keyword: %s, start searching images' % word)
         if index == 0:
             HeadlessChrome.search_by_keyword(driver, word, start_page)
