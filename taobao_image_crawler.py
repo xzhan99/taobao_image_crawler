@@ -173,7 +173,7 @@ class HeadlessChrome(object):
         user_agent = RandomUserAgent()
         options.add_argument('user-agent={user_agent}'.format(user_agent=user_agent.randomly_select()))
         options.add_argument("disable-infobars")
-        options.add_argument("disable-web-security")
+        options.add_argument("disable-web-security")    # 允许重定向
         options.add_argument('--headless')
         options.add_argument('--no-sandbox')
         # 配置chromedriver不加载图片
@@ -310,7 +310,7 @@ class HeadlessChrome(object):
                     }
                     self.mongo.save_info(item=item)
 
-        failed_times = 0
+        failed_times = 0    # 记录列表页访问失败的次数
         for page in range(PAGE_NUMBER):
             if start and page + 1 < start:
                 continue
@@ -320,12 +320,11 @@ class HeadlessChrome(object):
                 's': 44 * page
             }
             base_url = 'https://s.taobao.com/search?'
-            # 生成商品列表页url
-            url = base_url + urlencode(paras)
+            url = base_url + urlencode(paras)   # 生成商品列表页url
             if self.get(url) is False:
                 logging.error('Failed to load page %s' % url)
                 failed_times += 1
-                if failed_times >= 2:
+                if failed_times >= 2:   # 连续3页失败直接退出，防止频繁访问被反爬
                     raise TimeoutException
                 continue
 
